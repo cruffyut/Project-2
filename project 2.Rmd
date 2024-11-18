@@ -1,8 +1,8 @@
 ---
-title: "Project 1: Comparing the Statisitics of Countries in the World"
+title: "Project 2: Improvements to Comparing the Statisitics of Countries in the World"
 author: "Pixuan Shen"
 output: html_document
-date: "2024-10-14"
+date: "2024-11-15"
 ---
 
 ```{r setup, include=FALSE}
@@ -11,74 +11,122 @@ library(dplyr)
 library(janitor)
 library(ggplot2)
 library(maps)
+library(patchwork)
 ```
 
-This visualization shows the countries of the world colored by the percentage of their land that is arable. The gradient runs from a light blue color for countries with a low percentage of their land being arable, to purple for countries with with a high percentage of their land being arable. When taking a look at the graph, it is possible to see that most of the countries with a lot of arable land are from western Europe, North America, and South Asia. What is interesting is that countries that are near the equator, which is located at 0 degrees latitude, do not have the most arable land. 
+Summary of changes and improvements: 
+
+The first visualization created by my new code is very similar to Project 1, however, I changed it so that it will only highlight countries that the user tells the code to highlight. I put the map creation inside of a loop, so that the loop will cancel if the user gives a country that is either spelled incorrectly or does not exist. In the second visualization, the code and plot is completely different from that of Project 1. For the second visualization, I created a loop and put a conditional within the loop to generate a map of countries that fit a certain GDP per capita threshold. The loop will tell the user that their specified GDP per capita is too high and no countries fit the criteria if that is ever the case. The code has also been updated in both visualizations to fit the best practices criteria. The biggest thing that was done was editing the names and putting underscores to make the code easier to read and adding spaces wherever necessary.
+
 ```{r}
-countrydataset<-read.csv("data/countries of the world.csv")
+country_dataset <- read.csv("data/countries_of_the_world.csv")
 
-countrydataset <- countrydataset %>%
-  mutate(Arable = as.numeric(gsub(",", ".", Arable)))
+country_dataset <- country_dataset %>%
+  mutate(arable = as.numeric(gsub(",", ".", Arable)))
 
-mapdata <- map_data("world")
+map_data_world <- map_data("world")
 
-countrydataset <- countrydataset %>%
-  mutate(Country = case_when(Country == "United States" ~ "usa",
-    TRUE ~ Country))
+country_dataset <- country_dataset %>%
+  mutate(Country = case_when(
+    Country == "United States" ~ "usa",
+    TRUE ~ Country
+  ))
 
-mapdata <- mapdata %>%
+map_data_world <- map_data_world %>%
   mutate(region = tolower(region))
 
-countrydataset <- countrydataset %>%
+country_dataset <- country_dataset %>%
   mutate(Country = tolower(Country))
 
-mapdata <- left_join(mapdata, countrydataset, by = c("region" = "Country"))
+map_data_world <- left_join(map_data_world, country_dataset, by = c("region" = "Country"))
 
-cleandata <- mapdata %>%
-  filter(!is.na(Arable))
+highlight_arable_land <- function(highlight_countries) {
+  highlight_data <- map_data_world %>%
+    filter(region %in% highlight_countries & !is.na(arable))
+  
+  if (nrow(highlight_data) > 0) {
+    ggplot(map_data_world, aes(x = long, y = lat)) +
+      geom_polygon(aes(group = group), fill = "white", color = "gray") +
+      geom_polygon(data = highlight_data, aes(fill = arable, group = group), color = "gray") +
+      scale_fill_gradient(low = "lightblue", high = "purple", na.value = "gray") +
+      theme_minimal() +
+      labs(
+        fill = "% Arable Land",
+        title = "Countries by Arable Land (%)",
+        x = "Longitude",
+        y = "Latitude"
+      ) +
+      coord_fixed()
+  } else {
+    stop("No data available for the specified countries.")
+  }
+}
 
-ggplot(cleandata, aes(x = long, y = lat)) +
-  geom_polygon(aes(group = group, fill = Arable), color = "gray") +
-  scale_fill_gradient(low = "lightblue", high = "purple", na.value = "gray") +
-  theme_minimal() +
-  labs(fill = "% Arable Land", 
-       title = "Countries of the World by Arable Land (%)", 
-       x = "Longitude", 
-       y = "Latitude") +
-  coord_fixed()
+highlight_arable_land(c("usa", "canada", "germany", "france", "brazil"))
 ```
 
-The second visualization shows a plot that shows the GDP per capita of each country vs the amount of arable land they have. This is a continuation of the first graph that aims to show if there are relationships between the amount of arable land and a country's economic power. The graph is fitted with a line of best fit, which is in orange. While there are no statistical tests being ran here, it is possible to see that the regression line on the graph has a low slope, which either means that there is no relationship between arable land and GDP per capita, or that there is a very weak relationship at best. 
 ```{r}
-countrydataset <- countrydataset %>%
-  mutate(Arable = as.numeric(Arable),
-    GDP_per_capita = as.numeric(GDP_per_capita)) %>%
-  filter(!is.na(Arable), !is.na(GDP_per_capita))
+country_data <- read.csv("data/countries_of_the_world.csv")
 
-ggplot(countrydataset, aes(x = GDP_per_capita/10000, y = Arable)) +
-  geom_point(color = "blue", size = 2, alpha = 1) + 
-  geom_smooth(method = "lm", color = "orange", linetype = "solid", se = FALSE) +
-  xlim(0,6) +
-  ylim(0,75) + 
-  labs(title = "Relationship Between Arable Land (%) and GDP per capita (USD)",
-    x = "GDP Per Capita (in 10,000 US $)",
-    y = "Arable Land (%)") +
-  theme_minimal()
+country_data <- country_data %>%
+  mutate(
+    gdp_per_capita = as.numeric(gsub(",", "", GDP_per_capita)),
+    country = tolower(case_when(
+      Country == "United States" ~ "usa",
+      TRUE ~ Country
+    ))
+  )
+
+world_map <- map_data("world") %>%
+  mutate(region = tolower(region))
+
+map_data <- left_join(world_map, country_data, by = c("region" = "country"))
+
+gdp_thresholds <- c(5000, 10000, 20000)
+
+plots <- list()
+
+for (threshold in gdp_thresholds) {
+  map_data <- map_data %>%
+    mutate(highlight = ifelse(gdp_per_capita > threshold, "Above Threshold", "Below Threshold"))
+  
+  if (any(map_data$highlight == "Above Threshold")) {
+    p <- ggplot(map_data, aes(x = long, y = lat, group = group)) +
+      geom_polygon(aes(fill = highlight), color = "gray") +
+      scale_fill_manual(
+        values = c("Above Threshold" = "purple", "Below Threshold" = "lightgray"), 
+        na.value = "white"
+      ) +
+      labs(
+        fill = "GDP per Capita",
+        title = paste("Countries with GDP per Capita over", threshold, "USD"),
+        x = "Longitude",
+        y = "Latitude"
+      ) +
+      theme_minimal() +
+      coord_fixed()
+    
+    plots[[as.character(threshold)]] <- p
+  } else {
+    stop(paste("No countries with GDP per capita above", threshold))
+  }
+}
+
+combined_plot <- plots[[1]] + plots[[2]] + plots[[3]] + plot_layout(nrow = 3)
+
+combined_plot
 ```
-
-Visualization improvements:
-The changes to my visualization mainly involved the colors and the labels on the graphs. For the first graph, the world map, I changed the color for the country borders, which was suggested because the black color for the border made it very hard to see some of the smaller countries. I changed it to a gray color, which makes it slightly easier to tell the countries apart from one another. For the second graph, I changed the color of the regression line because somebody said that the purple on blue made it hard to see, which I also agreed with. I changed the color from purple to orange, which I think makes it much easier to see. Also, the second graph, I changed the GDP per capita from just USD to smaller units. In this case, the x-axis is in single digits, where each digit is 10,000 USD. Additionally, while it was not in the feedback, I changed the y-axis to max out at 75 because no single country actually goes above that amount. Lastly, I changed the titles for both graphs in response to feedback because the titles before were too long. 
-
 
 
 Dataset From Kaggle:
 
 https://www.kaggle.com/datasets/fernandol/countries-of-the-world
 
-
 References:
 
 R Help Page - geom_smooth
+
+R Help Page - Patchwork
 
 https://stackoverflow.com/questions/61838700/query-on-how-to-make-world-heat-map-using-ggplot-in-r
 
