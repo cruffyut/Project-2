@@ -1,0 +1,29 @@
+---
+title: "README"
+output: html_document
+date: "2024-11-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The following packages are required for the code to run:
+
+dplyr
+janitor
+ggplot2
+maps
+patchwork
+
+These packages can be installed using the following code:
+
+```{r}
+install.packages("dplyr")
+install.packages("janitor")
+install.packages("ggplot2")
+install.packages("maps")
+install.packages("patchwork")
+```
+
+The countries in the first visualization under the call to function "highlight_arable_land" can be changed, but there are already examples set. No other instructions are required for this project's code. 
